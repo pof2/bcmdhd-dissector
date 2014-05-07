@@ -17,6 +17,7 @@
 local bit = require("bit")
 local bcm = Proto("bcmwlan", "BCM WLAN dissector")
 local f = bcm.fields
+local event_type_strings = {}
 
 function bcm.init()
 	local udp_table = DissectorTable.get("ethertype")
@@ -35,7 +36,8 @@ function bcm.dissector(inbuffer, pinfo, tree)
 
 	subtree:add_le(f.event_version, buffer(n, 2)); n = n + 2
 	subtree:add_le(f.event_flags, buffer(n, 2)); n = n + 2
-	subtree:add_le(f.event_event_type, buffer(n, 4)); n = n + 4
+	local event_type = buffer(n, 4)
+	subtree:add_le(f.event_event_type, event_type); n = n + 4
 	subtree:add_le(f.event_status, buffer(n, 4)); n = n + 4
 	subtree:add_le(f.event_reason, buffer(n, 4)); n = n + 4
 	subtree:add_le(f.event_auth_type, buffer(n, 4)); n = n + 4
@@ -44,6 +46,13 @@ function bcm.dissector(inbuffer, pinfo, tree)
 	subtree:add_le(f.event_ifname, buffer(n, 16)); n = n + 16
 	subtree:add_le(f.event_ifidx, buffer(n, 1)); n = n + 1
 	subtree:add_le(f.event_bsscfgidx, buffer(n, 1)); n = n + 1
+
+	local event_type_int = event_type:le_uint()
+	if event_type_strings[event_type_int] ~= nil then
+		pinfo.cols.info:append(event_type_strings[event_type_int]:lower())
+	else
+		pinfo.cols.info:append("unknown event")
+	end
 
 --typedef struct {
 --	uint16                     version;              /*     0     2 */
@@ -63,7 +72,6 @@ function bcm.dissector(inbuffer, pinfo, tree)
 --} wl_event_msg_t;
 end
 
-local event_type_strings = {}
 event_type_strings[0] = "WLC_E_SET_SSID"
 event_type_strings[1] = "WLC_E_JOIN"
 event_type_strings[2] = "WLC_E_START"
