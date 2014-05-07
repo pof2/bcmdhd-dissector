@@ -25,6 +25,21 @@ function bcm.init()
 	udp_table:add(pattern, bcm)
 end
 
+function is_int_var(wlc_var)
+	local int_vars = {
+		"tlv", "ampdu_hostreorder", "arp_ol", "arpoe", "mpc", "wsec",
+		"qtxpower", "pfn", "chanspec", "apsta", "tdls_enable", "bcn_timeout",
+		"roam_off", "p2p_disc", "pkt_filter_mode", "bcn_timeout", "wlfc_mode",
+		"dtim_assoc", "bw_cap", "bw_cap", "mimo_bw_cap", "nmode", "p2p_dev",
+		"btc_params", "toe_ol" }
+
+	for i,v in pairs(int_vars) do
+		if v == wlc_var then
+			return true
+		end
+	end
+	return false
+end
 
 function bcm.dissector(inbuffer, pinfo, tree)
 	local n = 0
@@ -60,9 +75,19 @@ function bcm.dissector(inbuffer, pinfo, tree)
 			par:add(f.bcm_var_name, buffer(n)); n = n + buffer(n):stringz():len() + 1
 		elseif (cmd == 263) then
 			-- WLC_SET_VAR
-			pinfo.cols.info:append(" "..buffer(n):stringz())
-			par:add(f.bcm_var_name,  buffer(n)); n = n + buffer(n):stringz():len() + 1
+			local var_str = buffer(n):stringz()
+			pinfo.cols.info:append(" "..var_str)
+			par:add(f.bcm_var_name,  buffer(n)); n = n + var_str:len() + 1
+
+			if is_int_var(var_str) then
+				local value = buffer(n, 4)
+				pinfo.cols.info:append(" "..value:le_uint())
+				par:add_le(f.value32, value); n = n + 4
+				if (buffer:len() > n) then
+					par:add(f.unused, buffer(n)); n = buffer:len()
+				end
 			end
+		end
 
 		-- add data not parsed above
 		if (buffer:len() > n) then
@@ -393,6 +418,9 @@ cdc_ioctl_cmd_strings[315] = "WLC_SET_WAI_REKEY"
 cdc_ioctl_cmd_strings[316] = "WLC_SET_NAT_CONFIG"
 cdc_ioctl_cmd_strings[317] = "WLC_GET_NAT_STATE"
 cdc_ioctl_cmd_strings[318] = "WLC_LAST"
+
+f.value32 = ProtoField.uint32("bcm_cdc_ioctl.value32", "value32", base.DEC)
+f.unused = ProtoField.bytes("bcm_cdc_ioctl.data", "unused")
 
 f.data = ProtoField.bytes("bcm_cdc_ioctl.data", "data")
 
