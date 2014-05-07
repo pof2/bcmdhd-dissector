@@ -54,26 +54,8 @@ function bcm.dissector(inbuffer, pinfo, tree)
 	subtree:add_le(f.event_ifname, buffer(n, 16)); n = n + 16
 	subtree:add_le(f.event_ifidx, buffer(n, 1)); n = n + 1
 	subtree:add_le(f.event_bsscfgidx, buffer(n, 1)); n = n + 1
-
---typedef struct {
---	uint16                     version;              /*     0     2 */
---	uint16                     flags;                /*     2     2 */
---	uint32                     event_type;           /*     4     4 */
---	uint32                     status;               /*     8     4 */
---	uint32                     reason;               /*    12     4 */
---	uint32                     auth_type;            /*    16     4 */
---	uint32                     datalen;              /*    20     4 */
---	struct ether_addr          addr;                 /*    24     6 */
---	char                       ifname[16];           /*    30    16 */
---	uint8                      ifidx;                /*    46     1 */
---	uint8                      bsscfgidx;            /*    47     1 */
---
---	/* size: 48, cachelines: 1, members: 11 */
---	/* last cacheline: 48 bytes */
---} wl_event_msg_t;
 end
 
-local event_type_strings = {}
 event_type_strings[0] = "WLC_E_SET_SSID"
 event_type_strings[1] = "WLC_E_JOIN"
 event_type_strings[2] = "WLC_E_START"
@@ -181,21 +163,4 @@ f.event_addr = ProtoField.ether("bcm_event.addr", "addr")
 f.event_ifname = ProtoField.bytes("bcm_event.ifname", "ifname")
 f.event_ifidx = ProtoField.uint8("bcm_event.ifidx", "ifidx", base.DEC)
 f.event_bsscfgidx = ProtoField.uint8("bcm_event.bsscfgidx", "bsscfgidx", base.DEC)
-
---typedef struct {
---	uint16                     version;              /*     0     2 */
---	uint16                     flags;                /*     2     2 */
---	uint32                     event_type;           /*     4     4 */
---	uint32                     status;               /*     8     4 */
---	uint32                     reason;               /*    12     4 */
---	uint32                     auth_type;            /*    16     4 */
---	uint32                     datalen;              /*    20     4 */
---	struct ether_addr          addr;                 /*    24     6 */
---	char                       ifname[16];           /*    30    16 */
---	uint8                      ifidx;                /*    46     1 */
---	uint8                      bsscfgidx;            /*    47     1 */
---
---	/* size: 48, cachelines: 1, members: 11 */
---	/* last cacheline: 48 bytes */
---} wl_event_msg_t;
 
