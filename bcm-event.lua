@@ -17,6 +17,7 @@
 local bit = require("bit")
 local bcm = Proto("bcmwlan", "BCM WLAN dissector")
 local f = bcm.fields
+local event_type_strings = {}
 
 function bcm.init()
 	local udp_table = DissectorTable.get("ethertype")
@@ -28,10 +29,19 @@ end
 function bcm.dissector(inbuffer, pinfo, tree)
 	local n = 0
 	local buffer = inbuffer
-	pinfo.cols.protocol = "bcm"
+	pinfo.cols.protocol = "bcmdhd Event"
 	pinfo.cols.info = ""
 
 	local subtree = tree:add(bcm, buffer(), "BCM Event protocol data")
+
+	local event_type = buffer(4, 4):le_uint();
+	local event_type_str
+	if event_type_strings[event_type] ~= nil then
+		event_type_str = event_type_strings[event_type]:lower()
+	else
+		event_type_str = event_type
+	end
+	pinfo.cols.info:append(event_type_str)
 
 	subtree:add_le(f.event_version, buffer(n, 2)); n = n + 2
 	subtree:add_le(f.event_flags, buffer(n, 2)); n = n + 2
