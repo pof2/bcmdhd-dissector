@@ -29,7 +29,7 @@ end
 function bcm.dissector(inbuffer, pinfo, tree)
 	local n = 0
 	local buffer = inbuffer
-	pinfo.cols.protocol = "bcm"
+	pinfo.cols.protocol = "bcmdhd ioctl"
 	pinfo.cols.info = ""
 
 	local cmd = buffer(0, 4):le_uint();
