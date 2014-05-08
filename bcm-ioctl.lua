@@ -114,6 +114,9 @@ function dissector(inbuffer, pinfo, tree, out)
 				pinfo.cols.info:append(" "..value:le_uint())
 				par:add_le(f.value32, value); n = n + 4
 				parsed = true
+			elseif var_str == "cur_etheraddr" then
+				par:add_le(f.bcm_var_cur_etheraddr, buffer(n, 6)); n = n + 6
+				parsed = true
 			end
 			if parsed and buffer:len() > n then
 				par:add(f.unused, buffer(n)); n = buffer:len()
@@ -465,5 +468,6 @@ f.bcm_cdc_ioctl_status = ProtoField.uint32("bcm_cdc_ioctl.status", "status", bas
 
 f.bcm_var_name = ProtoField.stringz("bcm_var_name", "var_name")
 
+f.bcm_var_cur_etheraddr = ProtoField.ether("bcm_var_cur_etheraddr", "cur_etheraddr")
 
 
