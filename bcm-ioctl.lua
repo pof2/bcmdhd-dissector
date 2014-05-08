@@ -117,6 +117,13 @@ function dissector(inbuffer, pinfo, tree, out)
 			elseif var_str == "cur_etheraddr" then
 				par:add_le(f.bcm_var_cur_etheraddr, buffer(n, 6)); n = n + 6
 				parsed = true
+			elseif var_str == "mcast_list" then
+				local count = buffer(n, 4):le_uint()
+				par:add_le(f.bcm_var_mcast_list_count, buffer(n, 4)); n = n + 4
+				for i = 1, count do
+					par:add_le(f.bcm_var_mcast_list_addr, buffer(n, 6)); n = n + 6
+				end
+				parsed = true
 			end
 			if parsed and buffer:len() > n then
 				par:add(f.unused, buffer(n)); n = buffer:len()
@@ -470,4 +477,5 @@ f.bcm_var_name = ProtoField.stringz("bcm_var_name", "var_name")
 
 f.bcm_var_cur_etheraddr = ProtoField.ether("bcm_var_cur_etheraddr", "cur_etheraddr")
 
-
+f.bcm_var_mcast_list_count = ProtoField.uint32("bcm_var_mcast_list.count", "count", base.DEC)
+f.bcm_var_mcast_list_addr = ProtoField.ether("bcm_var_mcast_list.addr", "addr")
