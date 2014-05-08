@@ -104,6 +104,7 @@ function dissector(inbuffer, pinfo, tree, out)
 			pinfo.cols.info:append(" <reply data>")
 		elseif (cmd == 263 and out == 1) then
 			-- WLC_SET_VAR
+			local parsed = false
 			local var_str = buffer(n):stringz()
 			pinfo.cols.info:append(" "..var_str)
 			par:add(f.bcm_var_name,  buffer(n)); n = n + var_str:len() + 1
@@ -112,9 +113,10 @@ function dissector(inbuffer, pinfo, tree, out)
 				local value = buffer(n, 4)
 				pinfo.cols.info:append(" "..value:le_uint())
 				par:add_le(f.value32, value); n = n + 4
-				if (buffer:len() > n) then
-					par:add(f.unused, buffer(n)); n = buffer:len()
-				end
+				parsed = true
+			end
+			if parsed and buffer:len() > n then
+				par:add(f.unused, buffer(n)); n = buffer:len()
 			end
 		elseif (cmd == 263 and out == 0) then
 			pinfo.cols.info:append(" <reply data>")
