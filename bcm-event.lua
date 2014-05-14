@@ -33,8 +33,9 @@ function bcm.dissector(inbuffer, pinfo, tree)
 	pinfo.cols.info = ""
 
 	local subtree = tree:add(bcm, buffer(), "BCM Event protocol data")
+	local header = subtree:add(bcm, buffer(n, 8), "header")
 
-	local event_type = buffer(4, 4):le_uint();
+	local event_type = buffer(4, 4):uint();
 	local event_type_str
 	if event_type_strings[event_type] ~= nil then
 		event_type_str = event_type_strings[event_type]:lower()
@@ -43,17 +44,22 @@ function bcm.dissector(inbuffer, pinfo, tree)
 	end
 	pinfo.cols.info:append(event_type_str)
 
-	subtree:add_le(f.event_version, buffer(n, 2)); n = n + 2
-	subtree:add_le(f.event_flags, buffer(n, 2)); n = n + 2
-	subtree:add_le(f.event_event_type, buffer(n, 4)); n = n + 4
-	subtree:add_le(f.event_status, buffer(n, 4)); n = n + 4
-	subtree:add_le(f.event_reason, buffer(n, 4)); n = n + 4
-	subtree:add_le(f.event_auth_type, buffer(n, 4)); n = n + 4
-	subtree:add_le(f.event_datalen, buffer(n, 4)); n = n + 4
-	subtree:add_le(f.event_addr, buffer(n, 6)); n = n + 6
-	subtree:add_le(f.event_ifname, buffer(n, 16)); n = n + 16
-	subtree:add_le(f.event_ifidx, buffer(n, 1)); n = n + 1
-	subtree:add_le(f.event_bsscfgidx, buffer(n, 1)); n = n + 1
+	header:add(f.event_version, buffer(n, 2)); n = n + 2
+	header:add(f.event_flags, buffer(n, 2)); n = n + 2
+	header:add(f.event_event_type, buffer(n, 4)); n = n + 4
+	header:add(f.event_status, buffer(n, 4)); n = n + 4
+	header:add(f.event_reason, buffer(n, 4)); n = n + 4
+	header:add(f.event_auth_type, buffer(n, 4)); n = n + 4
+	header:add(f.event_datalen, buffer(n, 4)); n = n + 4
+	header:add(f.event_addr, buffer(n, 6)); n = n + 6
+	header:add(f.event_ifname, buffer(n, 16)); n = n + 16
+	header:add(f.event_ifidx, buffer(n, 1)); n = n + 1
+	header:add(f.event_bsscfgidx, buffer(n, 1)); n = n + 1
+
+	-- add data not parsed above
+	if (buffer:len() > n) then
+		subtree:add(f.data, buffer(n))
+	end
 end
 
 event_type_strings[0] = "WLC_E_SET_SSID"
@@ -151,6 +157,7 @@ event_type_strings[91] = "WLC_E_AUTH_REQ"
 event_type_strings[92] = "WLC_E_TDLS_PEER_EVENT"
 event_type_strings[93] = "WLC_E_SPEEDY_RECREATE_FAIL"
 
+f.data = ProtoField.bytes("bcm_event.data", "data")
 
 f.event_version = ProtoField.uint16("bcm_event.version", "version", base.DEC)
 f.event_flags = ProtoField.uint16("bcm_event.flags", "flags")
