@@ -39,7 +39,7 @@ function is_int_var(wlc_var)
 		"qtxpower", "pfn", "chanspec", "apsta", "tdls_enable", "bcn_timeout",
 		"roam_off", "p2p_disc", "pkt_filter_mode", "bcn_timeout", "wlfc_mode",
 		"dtim_assoc", "bw_cap", "bw_cap", "mimo_bw_cap", "nmode", "p2p_dev",
-		"btc_params", "toe_ol" }
+		"btc_params", "toe_ol", "ccx_enable", "bus:txglomalign", "assoc_listen"}
 
 	for i,v in pairs(int_vars) do
 		if v == wlc_var then
