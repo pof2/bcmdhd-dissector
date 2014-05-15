@@ -15,14 +15,22 @@
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 local bit = require("bit")
-local bcm = Proto("bcmioctl", "BCM WLAN dissector- IOCTLs")
-local f = bcm.fields
+local bcmioctlout = Proto("bcmioctlout", "BCM WLAN dissector- IOCTLout")
+local bcmioctlin = Proto("bcmioctlin", "BCM WLAN dissector- IOCTLin")
+local f = bcmioctlout.fields
 local cdc_ioctl_cmd_strings = {}
 
-function bcm.init()
+
+function bcmioctlout.init()
 	local udp_table = DissectorTable.get("ethertype")
 	local pattern = 0xBC02
-	udp_table:add(pattern, bcm)
+	udp_table:add(pattern, bcmioctlout)
+end
+
+function bcmioctlin.init()
+	local udp_table = DissectorTable.get("ethertype")
+	local pattern = 0xBC03
+	udp_table:add(pattern, bcmioctlin)
 end
 
 function is_int_var(wlc_var)
@@ -41,15 +49,34 @@ function is_int_var(wlc_var)
 	return false
 end
 
-function bcm.dissector(inbuffer, pinfo, tree)
+function bcmioctlin.dissector(inbuffer, pinfo, tree)
+	dissector(inbuffer, pinfo, tree, 0)
+end
+
+function bcmioctlout.dissector(inbuffer, pinfo, tree)
+	dissector(inbuffer, pinfo, tree, 1)
+end
+
+
+function dissector(inbuffer, pinfo, tree, out)
 	local n = 0
 	local buffer = inbuffer
-	pinfo.cols.protocol = "bcmdhd ioctl"
 	pinfo.cols.info = ""
 
 	local cmd = buffer(0, 4):le_uint();
 
-	local subtree = tree:add(bcm, buffer(), "BCM IOCTL")
+	local bcm = bcmioctlin
+
+	local proto_name = "bcmdhd_ioctl_in"
+	pinfo.cols.protocol = "ioctl in"
+	if (out == 1) then
+		bcm = bcmioctlout
+		proto_name = "bcmdhd_ioctl_out"
+	pinfo.cols.protocol = "ioctl out"
+	end
+
+
+	local subtree = tree:add(bcm, buffer(), proto_name)
 	local header = subtree:add(bcm, buffer(n, 8), "header")
 
 	header:add_le(f.bcm_cdc_ioctl_cmd, buffer(n, 4)); n = n + 4
@@ -69,11 +96,13 @@ function bcm.dissector(inbuffer, pinfo, tree)
 	if buffer:len() > n then
 		local par = subtree:add(bcm, buffer(n), cmd_str)
 
-		if (cmd == 262) then
+		if (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
 			pinfo.cols.info:append(" "..buffer(n):stringz())
 			par:add(f.bcm_var_name, buffer(n)); n = n + buffer(n):stringz():len() + 1
-		elseif (cmd == 263) then
+		elseif (cmd == 262 and out == 0) then
+			pinfo.cols.info:append(" <reply data>")
+		elseif (cmd == 263 and out == 1) then
 			-- WLC_SET_VAR
 			local var_str = buffer(n):stringz()
 			pinfo.cols.info:append(" "..var_str)
@@ -87,6 +116,8 @@ function bcm.dissector(inbuffer, pinfo, tree)
 					par:add(f.unused, buffer(n)); n = buffer:len()
 				end
 			end
+		elseif (cmd == 263 and out == 0) then
+			pinfo.cols.info:append(" <reply data>")
 		end
 
 		-- add data not parsed above
