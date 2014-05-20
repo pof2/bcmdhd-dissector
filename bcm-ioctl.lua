@@ -114,6 +114,10 @@ function dissector(inbuffer, pinfo, tree, out)
 				pinfo.cols.info:append(" "..value:le_uint())
 				par:add_le(f.value32, value); n = n + 4
 				parsed = true
+			elseif var_str == "arp_hostip" then
+				pinfo.cols.info:append(" "..tostring(buffer(n, 4):ipv4()))
+				par:add(f.bcm_var_arp_hostip, buffer(n, 4)); n = n + 4
+				parsed = true
 			elseif var_str == "cur_etheraddr" then
 				par:add_le(f.bcm_var_cur_etheraddr, buffer(n, 6)); n = n + 6
 				parsed = true
@@ -479,3 +483,5 @@ f.bcm_var_cur_etheraddr = ProtoField.ether("bcm_var_cur_etheraddr", "cur_etherad
 
 f.bcm_var_mcast_list_count = ProtoField.uint32("bcm_var_mcast_list.count", "count", base.DEC)
 f.bcm_var_mcast_list_addr = ProtoField.ether("bcm_var_mcast_list.addr", "addr")
+
+f.bcm_var_arp_hostip = ProtoField.ipv4("bcm_var_arp_hostip.ip", "ip")
