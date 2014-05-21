@@ -49,6 +49,39 @@ function is_int_var(wlc_var)
 	return false
 end
 
+function is_int_cmd(wlc_cmd)
+	local int_cmds = {
+		1,   -- GET_VERSION
+		2,   -- UP
+		3,   -- DOWN
+		10,  -- SET_PROMISC
+		12,  -- GET_RATE
+		20,  -- SET_INFRA
+		28,  -- TERMINATED
+		29,  -- GET_CHANNEL
+		30,  -- SET_CHANNEL
+		32,  -- SET_SRL
+		34,  -- SET_LRL
+		38,  -- SET_RADIO
+		49,  -- SET_PASSIVE_SCAN
+		76,  -- SET_BCNPRD
+		78,  -- SET_DTIMPRD
+		86,  -- SET_PM
+		118, -- SET_AP
+		158, -- SET_SCB_TIMEOUT
+		185, -- SET_SCAN_CHANNEL_TIME
+		187, -- SET_SCAN_UNASSOC_TIME
+		258  -- SET_SCAN_PASSIVE_TIME
+	}
+
+	for i, cmd in pairs(int_cmds) do
+		if cmd == wlc_cmd then
+			return true
+		end
+	end
+	return false
+end
+
 function bcmioctlin.dissector(inbuffer, pinfo, tree)
 	dissector(inbuffer, pinfo, tree, 0)
 end
@@ -96,7 +129,14 @@ function dissector(inbuffer, pinfo, tree, out)
 	if buffer:len() > n then
 		local par = subtree:add(bcm, buffer(n), cmd_str)
 
-		if (cmd == 262 and out == 1) then
+		if is_int_cmd(cmd) then
+			local value = buffer(n, 4)
+			pinfo.cols.info:append(" "..value:le_uint())
+			par:add_le(f.value32, value); n = n + 4
+			if buffer:len() > n then
+				par:add(f.unused, buffer(n)); n = buffer:len()
+			end
+		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
 			pinfo.cols.info:append(" "..buffer(n):stringz())
 			par:add(f.bcm_var_name, buffer(n)); n = n + buffer(n):stringz():len() + 1
