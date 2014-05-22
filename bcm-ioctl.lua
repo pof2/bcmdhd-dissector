@@ -136,6 +136,13 @@ function dissector(inbuffer, pinfo, tree, out)
 			if buffer:len() > n then
 				par:add(f.unused, buffer(n)); n = buffer:len()
 			end
+		elseif (cmd == 26) then
+			-- WLC_SET_SSID
+			par:add_le(f.WLC_SET_SSID_SSID_len, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_SET_SSID_SSID, buffer(n, 32)); n = n + 32
+			par:add_le(f.WLC_SET_SSID_bssid, buffer(n, 6)); n = n + 6
+			par:add_le(f.WLC_SET_SSID_chanspec_num, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_SET_SSID_chanspec_list, buffer(n, 2)); n = n + 2
 		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
 			pinfo.cols.info:append(" "..buffer(n):stringz())
@@ -525,3 +532,9 @@ f.bcm_var_mcast_list_count = ProtoField.uint32("bcm_var_mcast_list.count", "coun
 f.bcm_var_mcast_list_addr = ProtoField.ether("bcm_var_mcast_list.addr", "addr")
 
 f.bcm_var_arp_hostip = ProtoField.ipv4("bcm_var_arp_hostip.ip", "ip")
+
+f.WLC_SET_SSID_SSID_len = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_SSID_len", "SSID_len")
+f.WLC_SET_SSID_SSID = ProtoField.bytes("bcm_cdc_ioctl.WLC_SET_SSID_SSID", "SSID")
+f.WLC_SET_SSID_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_SET_SSID_bssid", "bssid")
+f.WLC_SET_SSID_chanspec_num = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_num", "chanspec_num")
+f.WLC_SET_SSID_chanspec_list = ProtoField.uint16("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_list", "chanspec_list")
