@@ -143,6 +143,18 @@ function dissector(inbuffer, pinfo, tree, out)
 			par:add_le(f.WLC_SET_SSID_bssid, buffer(n, 6)); n = n + 6
 			par:add_le(f.WLC_SET_SSID_chanspec_num, buffer(n, 4)); n = n + 4
 			par:add_le(f.WLC_SET_SSID_chanspec_list, buffer(n, 2)); n = n + 2
+		elseif (cmd == 50) then
+			-- WLC_SCAN
+			par:add_le(f.WLC_SCAN_ssid_le, buffer(n, 36)); n = n + 36
+			par:add_le(f.WLC_SCAN_bssid, buffer(n, 6)); n = n + 6
+			par:add_le(f.WLC_SCAN_bss_type, buffer(n, 1)); n = n + 1
+			par:add_le(f.WLC_SCAN_scan_type, buffer(n, 1)); n = n + 1
+			par:add_le(f.WLC_SCAN_nprobes, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_SCAN_active_time, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_SCAN_passive_time, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_SCAN_home_time, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_SCAN_channel_num, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_SCAN_channel_list, buffer(n, 2)); n = n + 2
 		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
 			pinfo.cols.info:append(" "..buffer(n):stringz())
@@ -538,3 +550,14 @@ f.WLC_SET_SSID_SSID = ProtoField.bytes("bcm_cdc_ioctl.WLC_SET_SSID_SSID", "SSID"
 f.WLC_SET_SSID_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_SET_SSID_bssid", "bssid")
 f.WLC_SET_SSID_chanspec_num = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_num", "chanspec_num")
 f.WLC_SET_SSID_chanspec_list = ProtoField.uint16("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_list", "chanspec_list")
+
+f.WLC_SCAN_ssid_le = ProtoField.bytes("bcm_cdc_ioctl.WLC_SCAN_ssid_le", "ssid_le")
+f.WLC_SCAN_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_SCAN_bssid", "bssid")
+f.WLC_SCAN_bss_type = ProtoField.uint8("bcm_cdc_ioctl.WLC_SCAN_bss_type", "bss_type")
+f.WLC_SCAN_scan_type = ProtoField.uint8("bcm_cdc_ioctl.WLC_SCAN_scan_type", "scan_type")
+f.WLC_SCAN_nprobes = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_nprobes", "nprobes")
+f.WLC_SCAN_active_time = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_active_time", "active_time")
+f.WLC_SCAN_passive_time = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_passive_time", "passive_time")
+f.WLC_SCAN_home_time = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_home_time", "home_time")
+f.WLC_SCAN_channel_num = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_channel_num", "channel_num")
+f.WLC_SCAN_channel_list = ProtoField.uint16("bcm_cdc_ioctl.WLC_SCAN_channel_list", "channel_list")
