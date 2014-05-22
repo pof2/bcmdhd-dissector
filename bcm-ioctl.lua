@@ -155,6 +155,10 @@ function dissector(inbuffer, pinfo, tree, out)
 			par:add_le(f.WLC_SCAN_home_time, buffer(n, 4)); n = n + 4
 			par:add_le(f.WLC_SCAN_channel_num, buffer(n, 4)); n = n + 4
 			par:add_le(f.WLC_SCAN_channel_list, buffer(n, 2)); n = n + 2
+		elseif (cmd == 52) then
+			-- WLC_DISASSOC
+			par:add_le(f.WLC_DISASSOC_val, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_DISASSOC_ea, buffer(n, 6)); n = n + 6
 		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
 			pinfo.cols.info:append(" "..buffer(n):stringz())
@@ -561,3 +565,6 @@ f.WLC_SCAN_passive_time = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_passive_time
 f.WLC_SCAN_home_time = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_home_time", "home_time")
 f.WLC_SCAN_channel_num = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_channel_num", "channel_num")
 f.WLC_SCAN_channel_list = ProtoField.uint16("bcm_cdc_ioctl.WLC_SCAN_channel_list", "channel_list")
+
+f.WLC_DISASSOC_val = ProtoField.uint32("bcm_cdc_ioctl.WLC_DISASSOC_val", "val")
+f.WLC_DISASSOC_ea = ProtoField.ether("bcm_cdc_ioctl.WLC_DISASSOC_ea", "ea")
