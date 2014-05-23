@@ -136,6 +136,9 @@ function dissector(inbuffer, pinfo, tree, out)
 			if buffer:len() > n then
 				par:add(f.unused, buffer(n)); n = buffer:len()
 			end
+		elseif (cmd == 23) then
+			-- WLC_GET_BSSID
+			par:add_le(f.WLC_GET_BSSID_bssid, buffer(n, 6)); n = n + 6
 		elseif (cmd == 26) then
 			-- WLC_SET_SSID
 			par:add_le(f.WLC_SET_SSID_SSID_len, buffer(n, 4)); n = n + 4
@@ -568,3 +571,5 @@ f.WLC_SCAN_channel_list = ProtoField.uint16("bcm_cdc_ioctl.WLC_SCAN_channel_list
 
 f.WLC_DISASSOC_val = ProtoField.uint32("bcm_cdc_ioctl.WLC_DISASSOC_val", "val")
 f.WLC_DISASSOC_ea = ProtoField.ether("bcm_cdc_ioctl.WLC_DISASSOC_ea", "ea")
+
+f.WLC_GET_BSSID_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_GET_BSSID_bssid", "bssid")
