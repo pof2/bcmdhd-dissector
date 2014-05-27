@@ -65,6 +65,7 @@ function is_int_cmd(wlc_cmd)
 		38,  -- SET_RADIO
 		49,  -- SET_PASSIVE_SCAN
 		76,  -- SET_BCNPRD
+		77,  -- GET_DTIMPRD
 		78,  -- SET_DTIMPRD
 		86,  -- SET_PM
 		118, -- SET_AP
