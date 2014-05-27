@@ -170,6 +170,10 @@ function dissector(inbuffer, pinfo, tree, out)
 			-- WLC_SET_ROAM_DELTA
 			par:add_le(f.WLC_SET_ROAM_DELTA_delta, buffer(n, 4)); n = n + 4
 			par:add_le(f.WLC_SET_ROAM_DELTA_band, buffer(n, 4)); n = n + 4
+		elseif (cmd == 127) then
+			-- WLC_GET_RSSI
+			par:add_le(f.WLC_GET_RSSI_val, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_GET_RSSI_ea, buffer(n, 6)); n = n + 6
 		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
 			pinfo.cols.info:append(" "..buffer(n):stringz())
@@ -592,3 +596,6 @@ f.WLC_SET_ROAM_TRIGGER_band = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_ROAM_TRIG
 
 f.WLC_SET_ROAM_DELTA_delta = ProtoField.int32("bcm_cdc_ioctl.WLC_SET_ROAM_DELTA_delta", "delta")
 f.WLC_SET_ROAM_DELTA_band = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_ROAM_DELTA_band", "band", base.DEC, band_strings)
+
+f.WLC_GET_RSSI_val = ProtoField.int32("bcm_cdc_ioctl.WLC_GET_RSSI_val", "val")
+f.WLC_GET_RSSI_ea = ProtoField.ether("bcm_cdc_ioctl.WLC_GET_RSSI_ea", "ea")
