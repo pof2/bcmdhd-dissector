@@ -19,7 +19,7 @@ local bcmioctlout = Proto("bcmioctlout", "BCM WLAN dissector- IOCTLout")
 local bcmioctlin = Proto("bcmioctlin", "BCM WLAN dissector- IOCTLin")
 local f = bcmioctlout.fields
 local cdc_ioctl_cmd_strings = {}
-
+local band_strings = {}
 
 function bcmioctlout.init()
 	local udp_table = DissectorTable.get("ethertype")
@@ -162,6 +162,10 @@ function dissector(inbuffer, pinfo, tree, out)
 			-- WLC_DISASSOC
 			par:add_le(f.WLC_DISASSOC_val, buffer(n, 4)); n = n + 4
 			par:add_le(f.WLC_DISASSOC_ea, buffer(n, 6)); n = n + 6
+		elseif (cmd == 55) then
+			-- WLC_SET_ROAM_TRIGGER
+			par:add_le(f.WLC_SET_ROAM_TRIGGER_level, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_SET_ROAM_TRIGGER_band, buffer(n, 4)); n = n + 4
 		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
 			pinfo.cols.info:append(" "..buffer(n):stringz())
@@ -532,6 +536,11 @@ cdc_ioctl_cmd_strings[316] = "WLC_SET_NAT_CONFIG"
 cdc_ioctl_cmd_strings[317] = "WLC_GET_NAT_STATE"
 cdc_ioctl_cmd_strings[318] = "WLC_LAST"
 
+band_strings[0] = "AUTO"
+band_strings[1] = "5G"
+band_strings[2] = "2G"
+band_strings[3] = "ALL"
+
 f.value32 = ProtoField.uint32("bcm_cdc_ioctl.value32", "value32", base.DEC)
 f.unused = ProtoField.bytes("bcm_cdc_ioctl.data", "unused")
 
@@ -573,3 +582,6 @@ f.WLC_DISASSOC_val = ProtoField.uint32("bcm_cdc_ioctl.WLC_DISASSOC_val", "val")
 f.WLC_DISASSOC_ea = ProtoField.ether("bcm_cdc_ioctl.WLC_DISASSOC_ea", "ea")
 
 f.WLC_GET_BSSID_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_GET_BSSID_bssid", "bssid")
+
+f.WLC_SET_ROAM_TRIGGER_level = ProtoField.int32("bcm_cdc_ioctl.WLC_SET_ROAM_TRIGGER_level", "level")
+f.WLC_SET_ROAM_TRIGGER_band = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_ROAM_TRIGGER_band", "band", base.DEC, band_strings)
