@@ -166,6 +166,10 @@ function dissector(inbuffer, pinfo, tree, out)
 			-- WLC_SET_ROAM_TRIGGER
 			par:add_le(f.WLC_SET_ROAM_TRIGGER_level, buffer(n, 4)); n = n + 4
 			par:add_le(f.WLC_SET_ROAM_TRIGGER_band, buffer(n, 4)); n = n + 4
+		elseif (cmd == 57) then
+			-- WLC_SET_ROAM_DELTA
+			par:add_le(f.WLC_SET_ROAM_DELTA_delta, buffer(n, 4)); n = n + 4
+			par:add_le(f.WLC_SET_ROAM_DELTA_band, buffer(n, 4)); n = n + 4
 		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
 			pinfo.cols.info:append(" "..buffer(n):stringz())
@@ -585,3 +589,6 @@ f.WLC_GET_BSSID_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_GET_BSSID_bssid", "b
 
 f.WLC_SET_ROAM_TRIGGER_level = ProtoField.int32("bcm_cdc_ioctl.WLC_SET_ROAM_TRIGGER_level", "level")
 f.WLC_SET_ROAM_TRIGGER_band = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_ROAM_TRIGGER_band", "band", base.DEC, band_strings)
+
+f.WLC_SET_ROAM_DELTA_delta = ProtoField.int32("bcm_cdc_ioctl.WLC_SET_ROAM_DELTA_delta", "delta")
+f.WLC_SET_ROAM_DELTA_band = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_ROAM_DELTA_band", "band", base.DEC, band_strings)
