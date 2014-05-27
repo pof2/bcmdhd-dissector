@@ -116,6 +116,7 @@ function dissector(inbuffer, pinfo, tree, out)
 	header:add_le(f.bcm_cdc_ioctl_cmd, buffer(n, 4)); n = n + 4
 	header:add_le(f.bcm_cdc_ioctl_len, buffer(n, 4)); n = n + 4
 	header:add_le(f.bcm_cdc_ioctl_flags, buffer(n, 4)); n = n + 4
+	local status = buffer(n, 4):le_int()
 	header:add_le(f.bcm_cdc_ioctl_status, buffer(n, 4)); n = n + 4
 
 	local cmd_str
@@ -220,6 +221,13 @@ function dissector(inbuffer, pinfo, tree, out)
 			par:add(f.data, buffer(n))
 		end
 
+		if (out == 0) then
+			if (status == 0) then
+				pinfo.cols.info:append(" OK")
+			else
+				pinfo.cols.info:append(" FAILED ("..status..")")
+			end
+		end
 	end
 end
 
