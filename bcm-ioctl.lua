@@ -180,6 +180,13 @@ function dissector(inbuffer, pinfo, tree, out)
 			-- WLC_GET_RSSI
 			par:add_le(f.WLC_GET_RSSI_val, buffer(n, 4)); n = n + 4
 			par:add_le(f.WLC_GET_RSSI_ea, buffer(n, 6)); n = n + 6
+		elseif (cmd == 217) then
+			-- WLC_GET_VALID_CHANNELS
+			local count = buffer(n, 4):le_uint()
+			par:add_le(f.WLC_GET_VALID_CHANNELS_count, buffer(n, 4)); n = n + 4
+			for i = 1, count do
+				par:add_le(f.WLC_GET_VALID_CHANNELS_channel, buffer(n, 4)); n = n + 4
+			end
 		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
 			pinfo.cols.info:append(" "..buffer(n):stringz())
@@ -612,3 +619,6 @@ f.WLC_SET_ROAM_DELTA_band = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_ROAM_DELTA_
 
 f.WLC_GET_RSSI_val = ProtoField.int32("bcm_cdc_ioctl.WLC_GET_RSSI_val", "val")
 f.WLC_GET_RSSI_ea = ProtoField.ether("bcm_cdc_ioctl.WLC_GET_RSSI_ea", "ea")
+
+f.WLC_GET_VALID_CHANNELS_count = ProtoField.int32("bcm_cdc_ioctl.WLC_GET_VALID_CHANNELS_count", "count")
+f.WLC_GET_VALID_CHANNELS_channel = ProtoField.int32("bcm_cdc_ioctl.WLC_GET_VALID_CHANNELS_channel", "channel")
