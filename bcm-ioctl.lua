@@ -89,7 +89,21 @@ function is_int_cmd(wlc_cmd)
 	return false
 end
 
-function parse_wl_scan(buffer, pinfo, tree)
+function parse_chanspec(bcm, buffer, pinfo, tree, use_subtree)
+	local n = 0
+	local channel = buffer(n, 1):uint()
+	local subtree
+	if (use_subtree == 1) then
+		subtree = tree:add(bcm, buffer(n, 2), "chanspec")
+	else
+		subtree = tree
+	end
+	subtree:add_le(f.chanspec_chan, buffer(n, 1)); n = n + 1
+	subtree:add_le(f.chanspec_other, buffer(n, 1)); n = n + 1
+	return n
+end
+
+function parse_wl_scan(bcm, buffer, pinfo, tree)
 	local n = 0
 	tree:add_le(f.wl_scan_ssid_len, buffer(n, 4)); n = n + 4
 	tree:add(f.wl_scan_ssid_le, buffer(n, 32)); n = n + 32
@@ -103,17 +117,17 @@ function parse_wl_scan(buffer, pinfo, tree)
 	local channel_num = buffer(n, 2):le_uint()
 	tree:add_le(f.wl_scan_channel_num, buffer(n, 4)); n = n + 4
 	for i = 1, channel_num do
-		tree:add_le(f.wl_scan_channel_list, buffer(n, 2)); n = n + 2
+		n = n + parse_chanspec(bcm, buffer(n), pinfo, tree, 1)
 	end
 	return n
 end
 
-function parse_escan(buffer, pinfo, tree)
+function parse_escan(bcm, buffer, pinfo, tree)
 	local n = 0
 	tree:add_le(f.escan_version, buffer(n, 4)); n = n + 4
 	tree:add_le(f.escan_action, buffer(n, 2)); n = n + 2
 	tree:add_le(f.escan_sync_id, buffer(n, 2)); n = n + 2
-	n = n + parse_wl_scan(buffer(n), pinfo, tree)
+	n = n + parse_wl_scan(bcm, buffer(n), pinfo, tree)
 	return n
 end
 
@@ -181,10 +195,10 @@ function dissector(inbuffer, pinfo, tree, out)
 			par:add_le(f.WLC_SET_SSID_SSID, buffer(n, 32)); n = n + 32
 			par:add_le(f.WLC_SET_SSID_bssid, buffer(n, 6)); n = n + 6
 			par:add_le(f.WLC_SET_SSID_chanspec_num, buffer(n, 4)); n = n + 4
-			par:add_le(f.WLC_SET_SSID_chanspec_list, buffer(n, 2)); n = n + 2
+			n = n + parse_chanspec(bcm, buffer(n), pinfo, par, 0)
 		elseif (cmd == 50) then
 			-- WLC_SCAN
-			n = n + parse_wl_scan(buffer(n), pinfo, par)
+			n = n + parse_wl_scan(bcm, buffer(n), pinfo, par)
 		elseif (cmd == 52) then
 			-- WLC_DISASSOC
 			par:add_le(f.WLC_DISASSOC_val, buffer(n, 4)); n = n + 4
@@ -241,7 +255,7 @@ function dissector(inbuffer, pinfo, tree, out)
 				end
 				parsed = true
 			elseif var_str == "escan" then
-				n = n + parse_escan(buffer(n), pinfo, par)
+				n = n + parse_escan(bcm, buffer(n), pinfo, par)
 			elseif var_str == "bsscfg:p2p_scan" then
 				-- p2p_scan
 				n = n + 4 -- Undefined padding
@@ -249,7 +263,7 @@ function dissector(inbuffer, pinfo, tree, out)
 				par:add_le(f.bcm_var_p2p_scan_type, buffer(n, 1)); n = n + 1
 				par:add_le(f.bcm_var_p2p_scan_reserved, buffer(n, 3)); n = n + 3
 				if (type == 0x45) then -- 'E' = escan
-					n = n + parse_escan(buffer(n), pinfo, par)
+					n = n + parse_escan(bcm, buffer(n), pinfo, par)
 				end
 				parsed = true
 			end
@@ -633,6 +647,9 @@ f.bcm_var_arp_hostip = ProtoField.ipv4("bcm_var_arp_hostip.ip", "ip")
 f.bcm_var_p2p_scan_type = ProtoField.uint8("bcm_var_p2p_scan.type", "type")
 f.bcm_var_p2p_scan_reserved = ProtoField.bytes("bcm_var_p2p_scan.reserved", "reserved")
 
+f.chanspec_chan = ProtoField.uint8("bcm_cdc_ioctl.chanspec.chan", "channel")
+f.chanspec_other = ProtoField.uint8("bcm_cdc_ioctl.chanspec.other", "other")
+
 f.escan_version = ProtoField.uint32("bcm_cdc_ioctl.escan.version", "version")
 f.escan_action = ProtoField.uint16("bcm_cdc_ioctl.escan.action", "action")
 f.escan_sync_id = ProtoField.uint16("bcm_cdc_ioctl.escan.sync_id", "sync_id")
@@ -654,7 +671,6 @@ f.WLC_SET_SSID_SSID_len = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_SSID_len
 f.WLC_SET_SSID_SSID = ProtoField.bytes("bcm_cdc_ioctl.WLC_SET_SSID_SSID", "SSID")
 f.WLC_SET_SSID_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_SET_SSID_bssid", "bssid")
 f.WLC_SET_SSID_chanspec_num = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_num", "chanspec_num")
-f.WLC_SET_SSID_chanspec_list = ProtoField.uint16("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_list", "chanspec_list")
 
 f.WLC_DISASSOC_val = ProtoField.uint32("bcm_cdc_ioctl.WLC_DISASSOC_val", "val")
 f.WLC_DISASSOC_ea = ProtoField.ether("bcm_cdc_ioctl.WLC_DISASSOC_ea", "ea")
