@@ -190,7 +190,7 @@ f.event_reason = ProtoField.uint32("bcm_event.reason", "reason", base.DEC)
 f.event_auth_type = ProtoField.uint32("bcm_event.auth_type", "auth_type", base.DEC)
 f.event_datalen = ProtoField.uint32("bcm_event.datalen", "datalen", base.DEC)
 f.event_addr = ProtoField.ether("bcm_event.addr", "addr")
-f.event_ifname = ProtoField.bytes("bcm_event.ifname", "ifname")
+f.event_ifname = ProtoField.stringz("bcm_event.ifname", "ifname")
 f.event_ifidx = ProtoField.uint8("bcm_event.ifidx", "ifidx", base.DEC)
 f.event_bsscfgidx = ProtoField.uint8("bcm_event.bsscfgidx", "bsscfgidx", base.DEC)
 
