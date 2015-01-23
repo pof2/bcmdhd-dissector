@@ -24,6 +24,7 @@ local bss_type_strings = {}
 local scan_type_strings = {}
 local p2p_state_strings = {}
 local event_msgs_strings = {}
+local p2p_if_type_strings = {}
 local last_get_var = ""
 
 function bcmioctlout.init()
@@ -298,6 +299,11 @@ function dissector(inbuffer, pinfo, tree, out)
 				parsed = true
 			elseif var_str == "event_msgs" then
 				n = n + parse_event_msgs(buffer(n), pinfo, par)
+				parsed = true
+			elseif var_str == "p2p_ifadd" then
+				par:add_le(f.bcm_var_p2p_ifadd_addr, buffer(n, 6)); n = n + 6
+				par:add_le(f.bcm_var_p2p_ifadd_type, buffer(n, 1)); n = n + 1
+				n = n + parse_chanspec(bcm, buffer(n), pinfo, par)
 				parsed = true
 			end
 			if parsed and buffer:len() > n then
@@ -732,6 +738,11 @@ event_msgs_strings[73] = "DCS_REQUEST"
 event_msgs_strings[74] = "FIFO_CREDIT_MAP"
 event_msgs_strings[75] = "ACTION_FRAME_RX"
 
+p2p_if_type_strings[0] = "CLIENT"
+p2p_if_type_strings[1] = "GO"
+p2p_if_type_strings[2] = "DYNBCN_GO"
+p2p_if_type_strings[3] = "DEV"
+
 f.value32 = ProtoField.uint32("bcm_cdc_ioctl.value32", "value32", base.DEC)
 f.unused = ProtoField.bytes("bcm_cdc_ioctl.data", "unused")
 
@@ -760,6 +771,9 @@ f.bcm_var_p2p_state_state = ProtoField.uint8("bcm_var_p2p_state.state", "state",
 f.bcm_var_p2p_state_dwell = ProtoField.uint16("bcm_var_p2p_state.dwell", "dwell")
 
 f.bcm_var_event_msgs_event = ProtoField.uint8("bcm_var_event_msgs.event", "event", base.DEC, event_msgs_strings	)
+
+f.bcm_var_p2p_ifadd_addr = ProtoField.ether("bcm_var_p2p_ifadd.addr", "addr")
+f.bcm_var_p2p_ifadd_type = ProtoField.uint8("bcm_var_p2p_ifadd.type", "type", base.DEC, p2p_if_type_strings)
 
 f.chanspec_chan = ProtoField.uint8("bcm_cdc_ioctl.chanspec.chan", "channel")
 f.chanspec_other = ProtoField.uint8("bcm_cdc_ioctl.chanspec.other", "other")
