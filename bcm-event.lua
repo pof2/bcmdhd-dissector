@@ -51,10 +51,15 @@ function bcm.dissector(inbuffer, pinfo, tree)
 	header:add(f.event_reason, buffer(n, 4)); n = n + 4
 	header:add(f.event_auth_type, buffer(n, 4)); n = n + 4
 	header:add(f.event_datalen, buffer(n, 4)); n = n + 4
+	local addr = buffer(n, 6):ether()
 	header:add(f.event_addr, buffer(n, 6)); n = n + 6
 	header:add(f.event_ifname, buffer(n, 16)); n = n + 16
 	header:add(f.event_ifidx, buffer(n, 1)); n = n + 1
 	header:add(f.event_bsscfgidx, buffer(n, 1)); n = n + 1
+
+	if (event_type == 69) then -- escan results
+		pinfo.cols.info:append(" " .. tostring(addr))
+	end
 
 	-- add data not parsed above
 	if (buffer:len() > n) then
