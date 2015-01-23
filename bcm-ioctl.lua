@@ -23,6 +23,8 @@ local band_strings = {}
 local bss_type_strings = {}
 local scan_type_strings = {}
 local p2p_state_strings = {}
+local event_msgs_strings = {}
+local last_get_var = ""
 
 function bcmioctlout.init()
 	local udp_table = DissectorTable.get("ethertype")
@@ -132,6 +134,21 @@ function parse_escan(bcm, buffer, pinfo, tree)
 	return n
 end
 
+function parse_event_msgs(buffer, pinfo, tree)
+	local n = 0
+        for i = 0, 127 do
+                local by = math.floor(i / 8)
+                local bi = (i % 8)
+                local b = buffer(by, 1):uint()
+
+                if (bit.band(b, bit.lshift(1, bi)) > 0) then
+                        tree:add(f.bcm_var_event_msgs_event, buffer(by, 1), i);
+                end
+
+        end
+        return 16
+end
+
 function bcmioctlin.dissector(inbuffer, pinfo, tree)
 	dissector(inbuffer, pinfo, tree, 0)
 end
@@ -225,10 +242,17 @@ function dissector(inbuffer, pinfo, tree, out)
 			end
 		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
+			last_get_var = buffer(n):stringz()
 			pinfo.cols.info:append(" "..buffer(n):stringz())
 			par:add(f.bcm_var_name, buffer(n)); n = n + buffer(n):stringz():len() + 1
+			if buffer:len() > n then
+				par:add(f.unused, buffer(n)); n = buffer:len()
+			end
 		elseif (cmd == 262 and out == 0) then
 			pinfo.cols.info:append(" <reply data>")
+			if last_get_var == "event_msgs" then
+				n = n + parse_event_msgs(buffer(n), pinfo, par)
+			end
 		elseif (cmd == 263 and out == 1) then
 			-- WLC_SET_VAR
 			local parsed = false
@@ -271,6 +295,9 @@ function dissector(inbuffer, pinfo, tree, out)
 				par:add_le(f.bcm_var_p2p_state_state, buffer(n, 1)); n = n + 1
 				n = n + parse_chanspec(bcm, buffer(n), pinfo, par, 0)
 				par:add_le(f.bcm_var_p2p_state_dwell, buffer(n, 2)); n = n + 2
+				parsed = true
+			elseif var_str == "event_msgs" then
+				n = n + parse_event_msgs(buffer(n), pinfo, par)
 				parsed = true
 			end
 			if parsed and buffer:len() > n then
@@ -633,6 +660,78 @@ p2p_state_strings[0] = "SCAN"
 p2p_state_strings[1] = "LISTEN"
 p2p_state_strings[2] = "SEARCH"
 
+event_msgs_strings[0] = "SET_SSID"
+event_msgs_strings[1] = "JOIN"
+event_msgs_strings[2] = "START"
+event_msgs_strings[3] = "AUTH"
+event_msgs_strings[4] = "AUTH_IND"
+event_msgs_strings[5] = "DEAUTH"
+event_msgs_strings[6] = "DEAUTH_IND"
+event_msgs_strings[7] = "ASSOC"
+event_msgs_strings[8] = "ASSOC_IND"
+event_msgs_strings[9] = "REASSOC"
+event_msgs_strings[10] = "REASSOC_IND"
+event_msgs_strings[11] = "DISASSOC"
+event_msgs_strings[12] = "DISASSOC_IND"
+event_msgs_strings[13] = "QUIET_START"
+event_msgs_strings[14] = "QUIET_END"
+event_msgs_strings[15] = "BEACON_RX"
+event_msgs_strings[16] = "LINK"
+event_msgs_strings[17] = "MIC_ERROR"
+event_msgs_strings[18] = "NDIS_LINK"
+event_msgs_strings[19] = "ROAM"
+event_msgs_strings[20] = "TXFAIL"
+event_msgs_strings[21] = "PMKID_CACHE"
+event_msgs_strings[22] = "RETROGRADE_TSF"
+event_msgs_strings[23] = "PRUNE"
+event_msgs_strings[24] = "AUTOAUTH"
+event_msgs_strings[25] = "EAPOL_MSG"
+event_msgs_strings[26] = "SCAN_COMPLETE"
+event_msgs_strings[27] = "ADDTS_IND"
+event_msgs_strings[28] = "DELTS_IND"
+event_msgs_strings[29] = "BCNSENT_IND"
+event_msgs_strings[30] = "BCNRX_MSG"
+event_msgs_strings[31] = "BCNLOST_MSG"
+event_msgs_strings[32] = "ROAM_PREP"
+event_msgs_strings[33] = "PFN_NET_FOUND"
+event_msgs_strings[34] = "PFN_NET_LOST"
+event_msgs_strings[35] = "RESET_COMPLETE"
+event_msgs_strings[36] = "JOIN_START"
+event_msgs_strings[37] = "ROAM_START"
+event_msgs_strings[38] = "ASSOC_START"
+event_msgs_strings[39] = "IBSS_ASSOC"
+event_msgs_strings[40] = "RADIO"
+event_msgs_strings[41] = "PSM_WATCHDOG"
+event_msgs_strings[44] = "PROBREQ_MSG"
+event_msgs_strings[45] = "SCAN_CONFIRM_IND"
+event_msgs_strings[46] = "PSK_SUP"
+event_msgs_strings[47] = "COUNTRY_CODE_CHANGED"
+event_msgs_strings[48] = "EXCEEDED_MEDIUM_TIME"
+event_msgs_strings[49] = "ICV_ERROR"
+event_msgs_strings[50] = "UNICAST_DECODE_ERROR"
+event_msgs_strings[51] = "MULTICAST_DECODE_ERROR"
+event_msgs_strings[52] = "TRACE"
+event_msgs_strings[54] = "IF"
+event_msgs_strings[55] = "P2P_DISC_LISTEN_COMPLETE"
+event_msgs_strings[56] = "RSSI"
+event_msgs_strings[57] = "PFN_SCAN_COMPLETE"
+event_msgs_strings[58] = "EXTLOG_MSG"
+event_msgs_strings[59] = "ACTION_FRAME"
+event_msgs_strings[60] = "ACTION_FRAME_COMPLETE"
+event_msgs_strings[61] = "PRE_ASSOC_IND"
+event_msgs_strings[62] = "PRE_REASSOC_IND"
+event_msgs_strings[63] = "CHANNEL_ADOPTED"
+event_msgs_strings[64] = "AP_STARTED"
+event_msgs_strings[65] = "DFS_AP_STOP"
+event_msgs_strings[66] = "DFS_AP_RESUME"
+event_msgs_strings[69] = "ESCAN_RESULT"
+event_msgs_strings[70] = "ACTION_FRAME_OFF_CHAN_COMPLETE"
+event_msgs_strings[71] = "PROBERESP_MSG"
+event_msgs_strings[72] = "P2P_PROBEREQ_MSG"
+event_msgs_strings[73] = "DCS_REQUEST"
+event_msgs_strings[74] = "FIFO_CREDIT_MAP"
+event_msgs_strings[75] = "ACTION_FRAME_RX"
+
 f.value32 = ProtoField.uint32("bcm_cdc_ioctl.value32", "value32", base.DEC)
 f.unused = ProtoField.bytes("bcm_cdc_ioctl.data", "unused")
 
@@ -659,6 +758,8 @@ f.bcm_var_p2p_scan_reserved = ProtoField.bytes("bcm_var_p2p_scan.reserved", "res
 
 f.bcm_var_p2p_state_state = ProtoField.uint8("bcm_var_p2p_state.state", "state", base.DEC, p2p_state_strings)
 f.bcm_var_p2p_state_dwell = ProtoField.uint16("bcm_var_p2p_state.dwell", "dwell")
+
+f.bcm_var_event_msgs_event = ProtoField.uint8("bcm_var_event_msgs.event", "event", base.DEC, event_msgs_strings	)
 
 f.chanspec_chan = ProtoField.uint8("bcm_cdc_ioctl.chanspec.chan", "channel")
 f.chanspec_other = ProtoField.uint8("bcm_cdc_ioctl.chanspec.other", "other")
