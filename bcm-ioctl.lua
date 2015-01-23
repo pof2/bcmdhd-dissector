@@ -22,6 +22,7 @@ local cdc_ioctl_cmd_strings = {}
 local band_strings = {}
 local bss_type_strings = {}
 local scan_type_strings = {}
+local p2p_state_strings = {}
 
 function bcmioctlout.init()
 	local udp_table = DissectorTable.get("ethertype")
@@ -265,6 +266,11 @@ function dissector(inbuffer, pinfo, tree, out)
 				if (type == 0x45) then -- 'E' = escan
 					n = n + parse_escan(bcm, buffer(n), pinfo, par)
 				end
+				parsed = true
+			elseif var_str == "bsscfg:p2p_state" then
+				par:add_le(f.bcm_var_p2p_state_state, buffer(n, 1)); n = n + 1
+				n = n + parse_chanspec(bcm, buffer(n), pinfo, par, 0)
+				par:add_le(f.bcm_var_p2p_state_dwell, buffer(n, 2)); n = n + 2
 				parsed = true
 			end
 			if parsed and buffer:len() > n then
@@ -623,6 +629,10 @@ bss_type_strings[2] = "ANY"
 scan_type_strings[0] = "ACTIVE"
 scan_type_strings[1] = "PASSIVE"
 
+p2p_state_strings[0] = "SCAN"
+p2p_state_strings[1] = "LISTEN"
+p2p_state_strings[2] = "SEARCH"
+
 f.value32 = ProtoField.uint32("bcm_cdc_ioctl.value32", "value32", base.DEC)
 f.unused = ProtoField.bytes("bcm_cdc_ioctl.data", "unused")
 
@@ -646,6 +656,9 @@ f.bcm_var_arp_hostip = ProtoField.ipv4("bcm_var_arp_hostip.ip", "ip")
 
 f.bcm_var_p2p_scan_type = ProtoField.uint8("bcm_var_p2p_scan.type", "type")
 f.bcm_var_p2p_scan_reserved = ProtoField.bytes("bcm_var_p2p_scan.reserved", "reserved")
+
+f.bcm_var_p2p_state_state = ProtoField.uint8("bcm_var_p2p_state.state", "state", base.DEC, p2p_state_strings)
+f.bcm_var_p2p_state_dwell = ProtoField.uint16("bcm_var_p2p_state.dwell", "dwell")
 
 f.chanspec_chan = ProtoField.uint8("bcm_cdc_ioctl.chanspec.chan", "channel")
 f.chanspec_other = ProtoField.uint8("bcm_cdc_ioctl.chanspec.other", "other")
