@@ -305,6 +305,9 @@ function dissector(inbuffer, pinfo, tree, out)
 				par:add_le(f.bcm_var_p2p_ifadd_type, buffer(n, 1)); n = n + 1
 				n = n + parse_chanspec(bcm, buffer(n), pinfo, par)
 				parsed = true
+			elseif var_str == "p2p_ifdel" then
+				par:add_le(f.bcm_var_p2p_ifdel_addr, buffer(n, 6)); n = n + 6
+				parsed = true
 			end
 			if parsed and buffer:len() > n then
 				par:add(f.unused, buffer(n)); n = buffer:len()
@@ -774,6 +777,8 @@ f.bcm_var_event_msgs_event = ProtoField.uint8("bcm_var_event_msgs.event", "event
 
 f.bcm_var_p2p_ifadd_addr = ProtoField.ether("bcm_var_p2p_ifadd.addr", "addr")
 f.bcm_var_p2p_ifadd_type = ProtoField.uint8("bcm_var_p2p_ifadd.type", "type", base.DEC, p2p_if_type_strings)
+
+f.bcm_var_p2p_ifdel_addr = ProtoField.ether("bcm_var_p2p_ifdel.addr", "addr")
 
 f.chanspec_chan = ProtoField.uint8("bcm_cdc_ioctl.chanspec.chan", "channel")
 f.chanspec_other = ProtoField.uint8("bcm_cdc_ioctl.chanspec.other", "other")
