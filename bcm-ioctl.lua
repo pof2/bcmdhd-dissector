@@ -107,10 +107,16 @@ function parse_chanspec(bcm, buffer, pinfo, tree, use_subtree)
 	return n
 end
 
+function parse_ssid(bcm, buffer, pinfo, tree)
+	local n = 0
+	tree:add_le(f.brcmf_ssid_len, buffer(n, 4)); n = n + 4
+	tree:add(f.brcmf_ssid, buffer(n, 32)); n = n + 32
+	return n
+end
+
 function parse_wl_scan(bcm, buffer, pinfo, tree)
 	local n = 0
-	tree:add_le(f.wl_scan_ssid_len, buffer(n, 4)); n = n + 4
-	tree:add(f.wl_scan_ssid_le, buffer(n, 32)); n = n + 32
+	n = n + parse_ssid(bcm, buffer(n), pinfo, tree)
 	tree:add_le(f.wl_scan_bssid, buffer(n, 6)); n = n + 6
 	tree:add_le(f.wl_scan_bss_type, buffer(n, 1)); n = n + 1
 	tree:add_le(f.wl_scan_scan_type, buffer(n, 1)); n = n + 1
@@ -210,8 +216,7 @@ function dissector(inbuffer, pinfo, tree, out)
 			par:add_le(f.WLC_GET_BSSID_bssid, buffer(n, 6)); n = n + 6
 		elseif (cmd == 26) then
 			-- WLC_SET_SSID
-			par:add_le(f.WLC_SET_SSID_SSID_len, buffer(n, 4)); n = n + 4
-			par:add_le(f.WLC_SET_SSID_SSID, buffer(n, 32)); n = n + 32
+			n = n + parse_ssid(bcm, buffer(n), pinfo, par)
 			par:add_le(f.WLC_SET_SSID_bssid, buffer(n, 6)); n = n + 6
 			par:add_le(f.WLC_SET_SSID_chanspec_num, buffer(n, 4)); n = n + 4
 			n = n + parse_chanspec(bcm, buffer(n), pinfo, par, 0)
@@ -788,8 +793,9 @@ f.escan_action = ProtoField.uint16("bcm_cdc_ioctl.escan.action", "action")
 f.escan_sync_id = ProtoField.uint16("bcm_cdc_ioctl.escan.sync_id", "sync_id")
 f.escan_params = ProtoField.bytes("bcm_cdc_ioctl.escan.params", "params")
 
-f.wl_scan_ssid_len = ProtoField.uint32("bcm_cdc_ioctl.wl_scan.ssid_len", "ssid_len")
-f.wl_scan_ssid_le = ProtoField.stringz("bcm_cdc_ioctl.wl_scan.ssid_le", "ssid_le")
+f.brcmf_ssid_len = ProtoField.uint32("cm_cdc_ioctl.brcmf_ssid.len", "ssid_len")
+f.brcmf_ssid = ProtoField.stringz("cm_cdc_ioctl.brcmf_ssid.ssid", "ssid")
+
 f.wl_scan_bssid = ProtoField.ether("bcm_cdc_ioctl.wl_scan.bssid", "bssid")
 f.wl_scan_bss_type = ProtoField.uint8("bcm_cdc_ioctl.wl_scan.bss_type", "bss_type", base.DEC, bss_type_strings)
 f.wl_scan_scan_type = ProtoField.uint8("bcm_cdc_ioctl.wl_scan.scan_type", "scan_type", base.DEC, scan_type_strings)
@@ -800,8 +806,6 @@ f.wl_scan_home_time = ProtoField.uint32("bcm_cdc_ioctl.wl_scan.home_time", "home
 f.wl_scan_channel_num = ProtoField.uint32("bcm_cdc_ioctl.wl_scan.channel_num", "channel_num")
 f.wl_scan_channel_list = ProtoField.uint16("bcm_cdc_ioctl.wl_scan.channel_list", "channel_list")
 
-f.WLC_SET_SSID_SSID_len = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_SSID_len", "SSID_len")
-f.WLC_SET_SSID_SSID = ProtoField.bytes("bcm_cdc_ioctl.WLC_SET_SSID_SSID", "SSID")
 f.WLC_SET_SSID_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_SET_SSID_bssid", "bssid")
 f.WLC_SET_SSID_chanspec_num = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_num", "chanspec_num")
 
