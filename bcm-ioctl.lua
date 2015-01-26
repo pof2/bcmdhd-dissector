@@ -20,6 +20,12 @@ local bcmioctlin = Proto("bcmioctlin", "BCM WLAN dissector- IOCTLin")
 local f = bcmioctlout.fields
 local cdc_ioctl_cmd_strings = {}
 local band_strings = {}
+local bss_type_strings = {}
+local scan_type_strings = {}
+local p2p_state_strings = {}
+local event_msgs_strings = {}
+local p2p_if_type_strings = {}
+local last_get_var = ""
 
 function bcmioctlout.init()
 	local udp_table = DissectorTable.get("ethertype")
@@ -39,7 +45,9 @@ function is_int_var(wlc_var)
 		"qtxpower", "pfn", "chanspec", "apsta", "tdls_enable", "bcn_timeout",
 		"roam_off", "p2p_disc", "pkt_filter_mode", "bcn_timeout", "wlfc_mode",
 		"dtim_assoc", "bw_cap", "bw_cap", "mimo_bw_cap", "nmode", "p2p_dev",
-		"btc_params", "toe_ol", "ccx_enable", "bus:txglomalign", "assoc_listen"}
+		"btc_params", "toe_ol", "ccx_enable", "bus:txglomalign", "assoc_listen",
+	        "rtsthresh", "fragthresh", "wowl_clear", "wowl", "wowl_activate",
+	        "obss_coex", "vhtmode", "rxchain" }
 
 	for i,v in pairs(int_vars) do
 		if v == wlc_var then
@@ -64,9 +72,11 @@ function is_int_cmd(wlc_cmd)
 		34,  -- SET_LRL
 		38,  -- SET_RADIO
 		49,  -- SET_PASSIVE_SCAN
+		75,  -- GET_BCNPRD
 		76,  -- SET_BCNPRD
 		77,  -- GET_DTIMPRD
 		78,  -- SET_DTIMPRD
+		85,  -- GET_PM
 		86,  -- SET_PM
 		118, -- SET_AP
 		158, -- SET_SCB_TIMEOUT
@@ -81,6 +91,69 @@ function is_int_cmd(wlc_cmd)
 		end
 	end
 	return false
+end
+
+function parse_chanspec(bcm, buffer, pinfo, tree, use_subtree)
+	local n = 0
+	local channel = buffer(n, 1):uint()
+	local subtree
+	if (use_subtree == 1) then
+		subtree = tree:add(bcm, buffer(n, 2), "chanspec")
+	else
+		subtree = tree
+	end
+	subtree:add_le(f.chanspec_chan, buffer(n, 1)); n = n + 1
+	subtree:add_le(f.chanspec_other, buffer(n, 1)); n = n + 1
+	return n
+end
+
+function parse_ssid(bcm, buffer, pinfo, tree)
+	local n = 0
+	tree:add_le(f.brcmf_ssid_len, buffer(n, 4)); n = n + 4
+	tree:add(f.brcmf_ssid, buffer(n, 32)); n = n + 32
+	return n
+end
+
+function parse_wl_scan(bcm, buffer, pinfo, tree)
+	local n = 0
+	n = n + parse_ssid(bcm, buffer(n), pinfo, tree)
+	tree:add_le(f.brcmf_bssid, buffer(n, 6)); n = n + 6
+	tree:add_le(f.wl_scan_bss_type, buffer(n, 1)); n = n + 1
+	tree:add_le(f.wl_scan_scan_type, buffer(n, 1)); n = n + 1
+	tree:add_le(f.wl_scan_nprobes, buffer(n, 4)); n = n + 4
+	tree:add_le(f.wl_scan_active_time, buffer(n, 4)); n = n + 4
+	tree:add_le(f.wl_scan_passive_time, buffer(n, 4)); n = n + 4
+	tree:add_le(f.wl_scan_home_time, buffer(n, 4)); n = n + 4
+	local channel_num = buffer(n, 2):le_uint()
+	tree:add_le(f.wl_scan_channel_num, buffer(n, 4)); n = n + 4
+	for i = 1, channel_num do
+		n = n + parse_chanspec(bcm, buffer(n), pinfo, tree, 1)
+	end
+	return n
+end
+
+function parse_escan(bcm, buffer, pinfo, tree)
+	local n = 0
+	tree:add_le(f.escan_version, buffer(n, 4)); n = n + 4
+	tree:add_le(f.escan_action, buffer(n, 2)); n = n + 2
+	tree:add_le(f.escan_sync_id, buffer(n, 2)); n = n + 2
+	n = n + parse_wl_scan(bcm, buffer(n), pinfo, tree)
+	return n
+end
+
+function parse_event_msgs(buffer, pinfo, tree)
+	local n = 0
+        for i = 0, 127 do
+                local by = math.floor(i / 8)
+                local bi = (i % 8)
+                local b = buffer(by, 1):uint()
+
+                if (bit.band(b, bit.lshift(1, bi)) > 0) then
+                        tree:add(f.bcm_var_event_msgs_event, buffer(by, 1), i);
+                end
+
+        end
+        return 16
 end
 
 function bcmioctlin.dissector(inbuffer, pinfo, tree)
@@ -140,26 +213,16 @@ function dissector(inbuffer, pinfo, tree, out)
 			end
 		elseif (cmd == 23) then
 			-- WLC_GET_BSSID
-			par:add_le(f.WLC_GET_BSSID_bssid, buffer(n, 6)); n = n + 6
+			par:add_le(f.brcmf_bssid, buffer(n, 6)); n = n + 6
 		elseif (cmd == 26) then
 			-- WLC_SET_SSID
-			par:add_le(f.WLC_SET_SSID_SSID_len, buffer(n, 4)); n = n + 4
-			par:add_le(f.WLC_SET_SSID_SSID, buffer(n, 32)); n = n + 32
-			par:add_le(f.WLC_SET_SSID_bssid, buffer(n, 6)); n = n + 6
+			n = n + parse_ssid(bcm, buffer(n), pinfo, par)
+			par:add_le(f.brcmf_bssid, buffer(n, 6)); n = n + 6
 			par:add_le(f.WLC_SET_SSID_chanspec_num, buffer(n, 4)); n = n + 4
-			par:add_le(f.WLC_SET_SSID_chanspec_list, buffer(n, 2)); n = n + 2
+			n = n + parse_chanspec(bcm, buffer(n), pinfo, par, 0)
 		elseif (cmd == 50) then
 			-- WLC_SCAN
-			par:add_le(f.WLC_SCAN_ssid_le, buffer(n, 36)); n = n + 36
-			par:add_le(f.WLC_SCAN_bssid, buffer(n, 6)); n = n + 6
-			par:add_le(f.WLC_SCAN_bss_type, buffer(n, 1)); n = n + 1
-			par:add_le(f.WLC_SCAN_scan_type, buffer(n, 1)); n = n + 1
-			par:add_le(f.WLC_SCAN_nprobes, buffer(n, 4)); n = n + 4
-			par:add_le(f.WLC_SCAN_active_time, buffer(n, 4)); n = n + 4
-			par:add_le(f.WLC_SCAN_passive_time, buffer(n, 4)); n = n + 4
-			par:add_le(f.WLC_SCAN_home_time, buffer(n, 4)); n = n + 4
-			par:add_le(f.WLC_SCAN_channel_num, buffer(n, 4)); n = n + 4
-			par:add_le(f.WLC_SCAN_channel_list, buffer(n, 2)); n = n + 2
+			n = n + parse_wl_scan(bcm, buffer(n), pinfo, par)
 		elseif (cmd == 52) then
 			-- WLC_DISASSOC
 			par:add_le(f.WLC_DISASSOC_val, buffer(n, 4)); n = n + 4
@@ -176,12 +239,26 @@ function dissector(inbuffer, pinfo, tree, out)
 			-- WLC_GET_RSSI
 			par:add_le(f.WLC_GET_RSSI_val, buffer(n, 4)); n = n + 4
 			par:add_le(f.WLC_GET_RSSI_ea, buffer(n, 6)); n = n + 6
+		elseif (cmd == 217) then
+			-- WLC_GET_VALID_CHANNELS
+			local count = buffer(n, 4):le_uint()
+			par:add_le(f.WLC_GET_VALID_CHANNELS_count, buffer(n, 4)); n = n + 4
+			for i = 1, count do
+				par:add_le(f.WLC_GET_VALID_CHANNELS_channel, buffer(n, 4)); n = n + 4
+			end
 		elseif (cmd == 262 and out == 1) then
 			-- WLC_GET_VAR
+			last_get_var = buffer(n):stringz()
 			pinfo.cols.info:append(" "..buffer(n):stringz())
 			par:add(f.bcm_var_name, buffer(n)); n = n + buffer(n):stringz():len() + 1
+			if buffer:len() > n then
+				par:add(f.unused, buffer(n)); n = buffer:len()
+			end
 		elseif (cmd == 262 and out == 0) then
 			pinfo.cols.info:append(" <reply data>")
+			if last_get_var == "event_msgs" then
+				n = n + parse_event_msgs(buffer(n), pinfo, par)
+			end
 		elseif (cmd == 263 and out == 1) then
 			-- WLC_SET_VAR
 			local parsed = false
@@ -207,6 +284,34 @@ function dissector(inbuffer, pinfo, tree, out)
 				for i = 1, count do
 					par:add_le(f.bcm_var_mcast_list_addr, buffer(n, 6)); n = n + 6
 				end
+				parsed = true
+			elseif var_str == "escan" then
+				n = n + parse_escan(bcm, buffer(n), pinfo, par)
+			elseif var_str == "bsscfg:p2p_scan" then
+				-- p2p_scan
+				n = n + 4 -- Undefined padding
+				local type = buffer(n, 1):le_uint()
+				par:add_le(f.bcm_var_p2p_scan_type, buffer(n, 1)); n = n + 1
+				par:add_le(f.bcm_var_p2p_scan_reserved, buffer(n, 3)); n = n + 3
+				if (type == 0x45) then -- 'E' = escan
+					n = n + parse_escan(bcm, buffer(n), pinfo, par)
+				end
+				parsed = true
+			elseif var_str == "bsscfg:p2p_state" then
+				par:add_le(f.bcm_var_p2p_state_state, buffer(n, 1)); n = n + 1
+				n = n + parse_chanspec(bcm, buffer(n), pinfo, par, 0)
+				par:add_le(f.bcm_var_p2p_state_dwell, buffer(n, 2)); n = n + 2
+				parsed = true
+			elseif var_str == "event_msgs" then
+				n = n + parse_event_msgs(buffer(n), pinfo, par)
+				parsed = true
+			elseif var_str == "p2p_ifadd" then
+				par:add_le(f.bcm_var_p2p_ifadd_addr, buffer(n, 6)); n = n + 6
+				par:add_le(f.bcm_var_p2p_ifadd_type, buffer(n, 1)); n = n + 1
+				n = n + parse_chanspec(bcm, buffer(n), pinfo, par)
+				parsed = true
+			elseif var_str == "p2p_ifdel" then
+				par:add_le(f.bcm_var_p2p_ifdel_addr, buffer(n, 6)); n = n + 6
 				parsed = true
 			end
 			if parsed and buffer:len() > n then
@@ -558,6 +663,94 @@ band_strings[1] = "5G"
 band_strings[2] = "2G"
 band_strings[3] = "ALL"
 
+bss_type_strings[0] = "INFRASTRUCTURE"
+bss_type_strings[1] = "INDEPENDENT"
+bss_type_strings[2] = "ANY"
+
+scan_type_strings[0] = "ACTIVE"
+scan_type_strings[1] = "PASSIVE"
+
+p2p_state_strings[0] = "SCAN"
+p2p_state_strings[1] = "LISTEN"
+p2p_state_strings[2] = "SEARCH"
+
+event_msgs_strings[0] = "SET_SSID"
+event_msgs_strings[1] = "JOIN"
+event_msgs_strings[2] = "START"
+event_msgs_strings[3] = "AUTH"
+event_msgs_strings[4] = "AUTH_IND"
+event_msgs_strings[5] = "DEAUTH"
+event_msgs_strings[6] = "DEAUTH_IND"
+event_msgs_strings[7] = "ASSOC"
+event_msgs_strings[8] = "ASSOC_IND"
+event_msgs_strings[9] = "REASSOC"
+event_msgs_strings[10] = "REASSOC_IND"
+event_msgs_strings[11] = "DISASSOC"
+event_msgs_strings[12] = "DISASSOC_IND"
+event_msgs_strings[13] = "QUIET_START"
+event_msgs_strings[14] = "QUIET_END"
+event_msgs_strings[15] = "BEACON_RX"
+event_msgs_strings[16] = "LINK"
+event_msgs_strings[17] = "MIC_ERROR"
+event_msgs_strings[18] = "NDIS_LINK"
+event_msgs_strings[19] = "ROAM"
+event_msgs_strings[20] = "TXFAIL"
+event_msgs_strings[21] = "PMKID_CACHE"
+event_msgs_strings[22] = "RETROGRADE_TSF"
+event_msgs_strings[23] = "PRUNE"
+event_msgs_strings[24] = "AUTOAUTH"
+event_msgs_strings[25] = "EAPOL_MSG"
+event_msgs_strings[26] = "SCAN_COMPLETE"
+event_msgs_strings[27] = "ADDTS_IND"
+event_msgs_strings[28] = "DELTS_IND"
+event_msgs_strings[29] = "BCNSENT_IND"
+event_msgs_strings[30] = "BCNRX_MSG"
+event_msgs_strings[31] = "BCNLOST_MSG"
+event_msgs_strings[32] = "ROAM_PREP"
+event_msgs_strings[33] = "PFN_NET_FOUND"
+event_msgs_strings[34] = "PFN_NET_LOST"
+event_msgs_strings[35] = "RESET_COMPLETE"
+event_msgs_strings[36] = "JOIN_START"
+event_msgs_strings[37] = "ROAM_START"
+event_msgs_strings[38] = "ASSOC_START"
+event_msgs_strings[39] = "IBSS_ASSOC"
+event_msgs_strings[40] = "RADIO"
+event_msgs_strings[41] = "PSM_WATCHDOG"
+event_msgs_strings[44] = "PROBREQ_MSG"
+event_msgs_strings[45] = "SCAN_CONFIRM_IND"
+event_msgs_strings[46] = "PSK_SUP"
+event_msgs_strings[47] = "COUNTRY_CODE_CHANGED"
+event_msgs_strings[48] = "EXCEEDED_MEDIUM_TIME"
+event_msgs_strings[49] = "ICV_ERROR"
+event_msgs_strings[50] = "UNICAST_DECODE_ERROR"
+event_msgs_strings[51] = "MULTICAST_DECODE_ERROR"
+event_msgs_strings[52] = "TRACE"
+event_msgs_strings[54] = "IF"
+event_msgs_strings[55] = "P2P_DISC_LISTEN_COMPLETE"
+event_msgs_strings[56] = "RSSI"
+event_msgs_strings[57] = "PFN_SCAN_COMPLETE"
+event_msgs_strings[58] = "EXTLOG_MSG"
+event_msgs_strings[59] = "ACTION_FRAME"
+event_msgs_strings[60] = "ACTION_FRAME_COMPLETE"
+event_msgs_strings[61] = "PRE_ASSOC_IND"
+event_msgs_strings[62] = "PRE_REASSOC_IND"
+event_msgs_strings[63] = "CHANNEL_ADOPTED"
+event_msgs_strings[64] = "AP_STARTED"
+event_msgs_strings[65] = "DFS_AP_STOP"
+event_msgs_strings[66] = "DFS_AP_RESUME"
+event_msgs_strings[69] = "ESCAN_RESULT"
+event_msgs_strings[70] = "ACTION_FRAME_OFF_CHAN_COMPLETE"
+event_msgs_strings[71] = "PROBERESP_MSG"
+event_msgs_strings[72] = "P2P_PROBEREQ_MSG"
+event_msgs_strings[73] = "DCS_REQUEST"
+event_msgs_strings[74] = "FIFO_CREDIT_MAP"
+event_msgs_strings[75] = "ACTION_FRAME_RX"
+
+p2p_if_type_strings[0] = "CLIENT"
+p2p_if_type_strings[1] = "GO"
+p2p_if_type_strings[2] = "DYNBCN_GO"
+p2p_if_type_strings[3] = "DEV"
+
 f.value32 = ProtoField.uint32("bcm_cdc_ioctl.value32", "value32", base.DEC)
 f.unused = ProtoField.bytes("bcm_cdc_ioctl.data", "unused")
 
@@ -578,27 +771,46 @@ f.bcm_var_mcast_list_addr = ProtoField.ether("bcm_var_mcast_list.addr", "addr")
 
 f.bcm_var_arp_hostip = ProtoField.ipv4("bcm_var_arp_hostip.ip", "ip")
 
-f.WLC_SET_SSID_SSID_len = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_SSID_len", "SSID_len")
-f.WLC_SET_SSID_SSID = ProtoField.bytes("bcm_cdc_ioctl.WLC_SET_SSID_SSID", "SSID")
-f.WLC_SET_SSID_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_SET_SSID_bssid", "bssid")
-f.WLC_SET_SSID_chanspec_num = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_num", "chanspec_num")
-f.WLC_SET_SSID_chanspec_list = ProtoField.uint16("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_list", "chanspec_list")
 
-f.WLC_SCAN_ssid_le = ProtoField.bytes("bcm_cdc_ioctl.WLC_SCAN_ssid_le", "ssid_le")
-f.WLC_SCAN_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_SCAN_bssid", "bssid")
-f.WLC_SCAN_bss_type = ProtoField.uint8("bcm_cdc_ioctl.WLC_SCAN_bss_type", "bss_type")
-f.WLC_SCAN_scan_type = ProtoField.uint8("bcm_cdc_ioctl.WLC_SCAN_scan_type", "scan_type")
-f.WLC_SCAN_nprobes = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_nprobes", "nprobes")
-f.WLC_SCAN_active_time = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_active_time", "active_time")
-f.WLC_SCAN_passive_time = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_passive_time", "passive_time")
-f.WLC_SCAN_home_time = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_home_time", "home_time")
-f.WLC_SCAN_channel_num = ProtoField.uint32("bcm_cdc_ioctl.WLC_SCAN_channel_num", "channel_num")
-f.WLC_SCAN_channel_list = ProtoField.uint16("bcm_cdc_ioctl.WLC_SCAN_channel_list", "channel_list")
+f.bcm_var_p2p_scan_type = ProtoField.uint8("bcm_var_p2p_scan.type", "type")
+f.bcm_var_p2p_scan_reserved = ProtoField.bytes("bcm_var_p2p_scan.reserved", "reserved")
+
+f.bcm_var_p2p_state_state = ProtoField.uint8("bcm_var_p2p_state.state", "state", base.DEC, p2p_state_strings)
+f.bcm_var_p2p_state_dwell = ProtoField.uint16("bcm_var_p2p_state.dwell", "dwell")
+
+f.bcm_var_event_msgs_event = ProtoField.uint8("bcm_var_event_msgs.event", "event", base.DEC, event_msgs_strings	)
+
+f.bcm_var_p2p_ifadd_addr = ProtoField.ether("bcm_var_p2p_ifadd.addr", "addr")
+f.bcm_var_p2p_ifadd_type = ProtoField.uint8("bcm_var_p2p_ifadd.type", "type", base.DEC, p2p_if_type_strings)
+
+f.bcm_var_p2p_ifdel_addr = ProtoField.ether("bcm_var_p2p_ifdel.addr", "addr")
+
+f.chanspec_chan = ProtoField.uint8("bcm_cdc_ioctl.chanspec.chan", "channel")
+f.chanspec_other = ProtoField.uint8("bcm_cdc_ioctl.chanspec.other", "other")
+
+f.escan_version = ProtoField.uint32("bcm_cdc_ioctl.escan.version", "version")
+f.escan_action = ProtoField.uint16("bcm_cdc_ioctl.escan.action", "action")
+f.escan_sync_id = ProtoField.uint16("bcm_cdc_ioctl.escan.sync_id", "sync_id")
+f.escan_params = ProtoField.bytes("bcm_cdc_ioctl.escan.params", "params")
+
+f.brcmf_ssid_len = ProtoField.uint32("cm_cdc_ioctl.brcmf_ssid.len", "ssid_len")
+f.brcmf_ssid = ProtoField.stringz("cm_cdc_ioctl.brcmf_ssid.ssid", "ssid")
+
+f.brcmf_bssid = ProtoField.ether("bcm_cdc_ioctl.brcmf_bssid", "bssid")
+
+f.wl_scan_bss_type = ProtoField.uint8("bcm_cdc_ioctl.wl_scan.bss_type", "bss_type", base.DEC, bss_type_strings)
+f.wl_scan_scan_type = ProtoField.uint8("bcm_cdc_ioctl.wl_scan.scan_type", "scan_type", base.DEC, scan_type_strings)
+f.wl_scan_nprobes = ProtoField.uint32("bcm_cdc_ioctl.wl_scan.nprobes", "nprobes")
+f.wl_scan_active_time = ProtoField.uint32("bcm_cdc_ioctl.wl_scan.active_time", "active_time")
+f.wl_scan_passive_time = ProtoField.uint32("bcm_cdc_ioctl.wl_scan.passive_time", "passive_time")
+f.wl_scan_home_time = ProtoField.uint32("bcm_cdc_ioctl.wl_scan.home_time", "home_time")
+f.wl_scan_channel_num = ProtoField.uint32("bcm_cdc_ioctl.wl_scan.channel_num", "channel_num")
+f.wl_scan_channel_list = ProtoField.uint16("bcm_cdc_ioctl.wl_scan.channel_list", "channel_list")
+
+f.WLC_SET_SSID_chanspec_num = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_SSID_chanspec_num", "chanspec_num")
 
 f.WLC_DISASSOC_val = ProtoField.uint32("bcm_cdc_ioctl.WLC_DISASSOC_val", "val")
 f.WLC_DISASSOC_ea = ProtoField.ether("bcm_cdc_ioctl.WLC_DISASSOC_ea", "ea")
-
-f.WLC_GET_BSSID_bssid = ProtoField.ether("bcm_cdc_ioctl.WLC_GET_BSSID_bssid", "bssid")
 
 f.WLC_SET_ROAM_TRIGGER_level = ProtoField.int32("bcm_cdc_ioctl.WLC_SET_ROAM_TRIGGER_level", "level")
 f.WLC_SET_ROAM_TRIGGER_band = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_ROAM_TRIGGER_band", "band", base.DEC, band_strings)
@@ -608,3 +820,6 @@ f.WLC_SET_ROAM_DELTA_band = ProtoField.uint32("bcm_cdc_ioctl.WLC_SET_ROAM_DELTA_
 
 f.WLC_GET_RSSI_val = ProtoField.int32("bcm_cdc_ioctl.WLC_GET_RSSI_val", "val")
 f.WLC_GET_RSSI_ea = ProtoField.ether("bcm_cdc_ioctl.WLC_GET_RSSI_ea", "ea")
+
+f.WLC_GET_VALID_CHANNELS_count = ProtoField.int32("bcm_cdc_ioctl.WLC_GET_VALID_CHANNELS_count", "count")
+f.WLC_GET_VALID_CHANNELS_channel = ProtoField.int32("bcm_cdc_ioctl.WLC_GET_VALID_CHANNELS_channel", "channel")

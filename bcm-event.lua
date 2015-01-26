@@ -18,6 +18,7 @@ local bit = require("bit")
 local bcm = Proto("bcmwlan", "BCM WLAN dissector")
 local f = bcm.fields
 local event_type_strings = {}
+local event_status_strings = {}
 
 function bcm.init()
 	local udp_table = DissectorTable.get("ethertype")
@@ -51,10 +52,15 @@ function bcm.dissector(inbuffer, pinfo, tree)
 	header:add(f.event_reason, buffer(n, 4)); n = n + 4
 	header:add(f.event_auth_type, buffer(n, 4)); n = n + 4
 	header:add(f.event_datalen, buffer(n, 4)); n = n + 4
+	local addr = buffer(n, 6):ether()
 	header:add(f.event_addr, buffer(n, 6)); n = n + 6
 	header:add(f.event_ifname, buffer(n, 16)); n = n + 16
 	header:add(f.event_ifidx, buffer(n, 1)); n = n + 1
 	header:add(f.event_bsscfgidx, buffer(n, 1)); n = n + 1
+
+	if (event_type == 69) then -- escan results
+		pinfo.cols.info:append(" " .. tostring(addr))
+	end
 
 	-- add data not parsed above
 	if (buffer:len() > n) then
@@ -157,17 +163,34 @@ event_type_strings[91] = "WLC_E_AUTH_REQ"
 event_type_strings[92] = "WLC_E_TDLS_PEER_EVENT"
 event_type_strings[93] = "WLC_E_SPEEDY_RECREATE_FAIL"
 
+event_status_strings[0] = "SUCCESS"
+event_status_strings[1] = "FAIL"
+event_status_strings[2] = "TIMEOUT"
+event_status_strings[3] = "NO_NETWORKS"
+event_status_strings[4] = "ABORT"
+event_status_strings[5] = "NO_ACK"
+event_status_strings[6] = "UNSOLICITED"
+event_status_strings[7] = "ATTEMPT"
+event_status_strings[8] = "PARTIAL"
+event_status_strings[9] = "NEWSCAN"
+event_status_strings[10] = "NEWASSOC"
+event_status_strings[11] = "11HQUIET"
+event_status_strings[12] = "SUPPRESS"
+event_status_strings[13] = "NOCHANS"
+event_status_strings[15] = "CS_ABORT"
+event_status_strings[16] = "ERROR"
+
 f.data = ProtoField.bytes("bcm_event.data", "data")
 
 f.event_version = ProtoField.uint16("bcm_event.version", "version", base.DEC)
 f.event_flags = ProtoField.uint16("bcm_event.flags", "flags")
 f.event_event_type = ProtoField.uint32("bcm_event.event_type", "event_type", base.DEC, event_type_strings)
-f.event_status = ProtoField.uint32("bcm_event.status", "status", base.DEC)
+f.event_status = ProtoField.uint32("bcm_event.status", "status", base.DEC, event_status_strings)
 f.event_reason = ProtoField.uint32("bcm_event.reason", "reason", base.DEC)
 f.event_auth_type = ProtoField.uint32("bcm_event.auth_type", "auth_type", base.DEC)
 f.event_datalen = ProtoField.uint32("bcm_event.datalen", "datalen", base.DEC)
 f.event_addr = ProtoField.ether("bcm_event.addr", "addr")
-f.event_ifname = ProtoField.bytes("bcm_event.ifname", "ifname")
+f.event_ifname = ProtoField.stringz("bcm_event.ifname", "ifname")
 f.event_ifidx = ProtoField.uint8("bcm_event.ifidx", "ifidx", base.DEC)
 f.event_bsscfgidx = ProtoField.uint8("bcm_event.bsscfgidx", "bsscfgidx", base.DEC)
 
