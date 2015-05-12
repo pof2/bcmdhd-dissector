@@ -25,3 +25,7 @@ plugins installed.
 4) Capture kernel log <pre>adb shell cat /proc/kmsg | tee dump.txt</pre>
 5) Convert to pcap: <pre>cat dump.txt | grep bcmdump | perl -pe 's/.{4}(.{12}).{20}(.+)/$1 $2/' | text2pcap -q -t "%s." -l 105 - dump.pcap</pre>
 6) Open pcap file with wireshark
+
+Example dumps
+-------------
+The examples folder contains some dumps taken from a patched brcmfmac driver
