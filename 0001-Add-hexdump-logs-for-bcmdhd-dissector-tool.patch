@@ -1,0 +1,168 @@
+From a31a9592efe44bbe9f25d50d65dd710051ad40c0 Mon Sep 17 00:00:00 2001
+From: Mikael Kanstrup <mikael.kanstrup@gmail.com>
+Date: Tue, 12 May 2015 14:08:12 +0200
+Subject: [PATCH] Add hexdump logs for bcmdhd-dissector tool
+
+Add debug hexdump prints to be used to dissect firmware
+protocol data with bcmdhd-dissector tool:
+  https://github.com/pof2/bcmdhd-dissector
+---
+ drivers/net/wireless/brcm80211/brcmfmac/bcdc.c  |  4 ++
+ drivers/net/wireless/brcm80211/brcmfmac/debug.c | 56 +++++++++++++++++++++++++
+ drivers/net/wireless/brcm80211/brcmfmac/debug.h | 12 ++++++
+ drivers/net/wireless/brcm80211/brcmfmac/fweh.c  |  2 +
+ 4 files changed, 74 insertions(+)
+
+diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcdc.c b/drivers/net/wireless/brcm80211/brcmfmac/bcdc.c
+index 8e0e91c..9b4662d 100644
+--- a/drivers/net/wireless/brcm80211/brcmfmac/bcdc.c
++++ b/drivers/net/wireless/brcm80211/brcmfmac/bcdc.c
+@@ -134,6 +134,8 @@ brcmf_proto_bcdc_msg(struct brcmf_pub *drvr, int ifidx, uint cmd, void *buf,
+ 	if (len > BRCMF_TX_IOCTL_MAX_MSG_SIZE)
+ 		len = BRCMF_TX_IOCTL_MAX_MSG_SIZE;
+ 
++	brcmf_dbg_dissect_dump(BRCMF_DISSECT_IOCTL, 1, &bcdc->msg, len);
++
+ 	/* Send request */
+ 	return brcmf_bus_txctl(drvr->bus_if, (unsigned char *)&bcdc->msg, len);
+ }
+@@ -152,6 +154,8 @@ static int brcmf_proto_bcdc_cmplt(struct brcmf_pub *drvr, u32 id, u32 len)
+ 			break;
+ 	} while (BCDC_DCMD_ID(le32_to_cpu(bcdc->msg.flags)) != id);
+ 
++	brcmf_dbg_dissect_dump(BRCMF_DISSECT_IOCTL, 0, &bcdc->msg, len);
++
+ 	return ret;
+ }
+ 
+diff --git a/drivers/net/wireless/brcm80211/brcmfmac/debug.c b/drivers/net/wireless/brcm80211/brcmfmac/debug.c
+index 9b473d5..fd1a34e 100644
+--- a/drivers/net/wireless/brcm80211/brcmfmac/debug.c
++++ b/drivers/net/wireless/brcm80211/brcmfmac/debug.c
+@@ -115,3 +115,59 @@ int brcmf_debugfs_add_entry(struct brcmf_pub *drvr, const char *fn,
+ 
+ 	return PTR_ERR_OR_ZERO(dentry);
+ }
++
++static u8 brcmf_dbg_dump_buf[0x22 + BRCMF_DCMD_MAXLEN];
++
++int brcmf_dbg_dissect_dump(int type, int tx, void *data, int len)
++{
++	/* This is an 802.11 header with ethertype BC01 */
++	const char event_hdr[] = {
++		0x88, 0x01, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01,
++		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
++		0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00,
++		0x00, 0x00, 0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00,
++		0xbc, 0x01 };
++	const char *event_prefix = "bcmdump: EVENT <<< ";
++
++	/* This is an 802.11 header with ethertype BC02 */
++	const char ioctl_out_hdr[] = {
++		0x88, 0x01, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01,
++		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
++		0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00,
++		0x00, 0x00, 0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00,
++		0xbc, 0x02 };
++	const char *ioctl_out_prefix = "bcmdump: IOCTL >>>  ";
++
++	/* This is an 802.11 header with ethertype BC03 */
++	const char ioctl_in_hdr[] = {
++		0x88, 0x01, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01,
++		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
++		0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00,
++		0x00, 0x00, 0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00,
++		0xbc, 0x03 };
++	const char *ioctl_in_prefix = "bcmdump: IOCTL <<<<  ";
++	const char *hdr;
++	const char *prefix;
++
++	if (!BRCMF_DISSECT_ON())
++		return 0;
++
++	if (type == BRCMF_DISSECT_IOCTL && tx) {
++		hdr = ioctl_out_hdr;
++		prefix = ioctl_out_prefix;
++	} else if (type == BRCMF_DISSECT_IOCTL && !tx) {
++		hdr = ioctl_in_hdr;
++		prefix = ioctl_in_prefix;
++	} else if (type == BRCMF_DISSECT_EVENT) {
++		hdr = event_hdr;
++		prefix = event_prefix;
++	} else {
++		return -EINVAL;
++	}
++
++	memcpy(brcmf_dbg_dump_buf, hdr, 0x22);
++	memcpy(brcmf_dbg_dump_buf + 0x22, data, len);
++	print_hex_dump(KERN_DEBUG, prefix, DUMP_PREFIX_OFFSET, 32, 1,
++		       brcmf_dbg_dump_buf, 0x22 + len, false);
++	return 0;
++}
+diff --git a/drivers/net/wireless/brcm80211/brcmfmac/debug.h b/drivers/net/wireless/brcm80211/brcmfmac/debug.h
+index eb0b8c4..441e41d 100644
+--- a/drivers/net/wireless/brcm80211/brcmfmac/debug.h
++++ b/drivers/net/wireless/brcm80211/brcmfmac/debug.h
+@@ -37,6 +37,10 @@
+ #define BRCMF_SDIO_VAL		0x00020000
+ #define BRCMF_MSGBUF_VAL	0x00040000
+ #define BRCMF_PCIE_VAL		0x00080000
++#define BRCMF_DISSECT_VAL	0x00100000
++
++#define BRCMF_DISSECT_IOCTL	0
++#define BRCMF_DISSECT_EVENT	1
+ 
+ /* set default print format */
+ #undef pr_fmt
+@@ -78,6 +82,7 @@ do {								\
+ #define BRCMF_GLOM_ON()		(brcmf_msg_level & BRCMF_GLOM_VAL)
+ #define BRCMF_EVENT_ON()	(brcmf_msg_level & BRCMF_EVENT_VAL)
+ #define BRCMF_FIL_ON()		(brcmf_msg_level & BRCMF_FIL_VAL)
++#define BRCMF_DISSECT_ON()	(brcmf_msg_level & BRCMF_DISSECT_VAL)
+ 
+ #else /* defined(DEBUG) || defined(CONFIG_BRCM_TRACING) */
+ 
+@@ -90,6 +95,7 @@ do {								\
+ #define BRCMF_GLOM_ON()		0
+ #define BRCMF_EVENT_ON()	0
+ #define BRCMF_FIL_ON()		0
++#define BRCMF_DISSECT_ON()	0
+ 
+ #endif /* defined(DEBUG) || defined(CONFIG_BRCM_TRACING) */
+ 
+@@ -111,6 +117,7 @@ void brcmf_debugfs_detach(struct brcmf_pub *drvr);
+ struct dentry *brcmf_debugfs_get_devdir(struct brcmf_pub *drvr);
+ int brcmf_debugfs_add_entry(struct brcmf_pub *drvr, const char *fn,
+ 			    int (*read_fn)(struct seq_file *seq, void *data));
++int brcmf_dbg_dissect_dump(int type, int tx, void *data, int len);
+ #else
+ static inline void brcmf_debugfs_init(void)
+ {
+@@ -131,6 +138,11 @@ int brcmf_debugfs_add_entry(struct brcmf_pub *drvr, const char *fn,
+ {
+ 	return 0;
+ }
++static inline
++int brcmf_dbg_dissect_dump(int type, int tx, void *data, int len)
++{
++	return 0;
++}
+ #endif
+ 
+ #endif /* BRCMFMAC_DEBUG_H */
+diff --git a/drivers/net/wireless/brcm80211/brcmfmac/fweh.c b/drivers/net/wireless/brcm80211/brcmfmac/fweh.c
+index ec62492..608d272 100644
+--- a/drivers/net/wireless/brcm80211/brcmfmac/fweh.c
++++ b/drivers/net/wireless/brcm80211/brcmfmac/fweh.c
+@@ -285,6 +285,8 @@ static void brcmf_fweh_event_worker(struct work_struct *work)
+ 		emsg.ifidx = emsg_be->ifidx;
+ 		emsg.bsscfgidx = emsg_be->bsscfgidx;
+ 
++		brcmf_dbg_dissect_dump(BRCMF_DISSECT_EVENT, 0, &event->emsg,
++				       sizeof(event->emsg));
+ 		brcmf_dbg(EVENT, "  version %u flags %u status %u reason %u\n",
+ 			  emsg.version, emsg.flags, emsg.status, emsg.reason);
+ 		brcmf_dbg_hex_dump(BRCMF_EVENT_ON(), event->data,
+-- 
+1.8.2.2
+
