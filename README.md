@@ -41,3 +41,7 @@ wireshark with the lua dissector plugins installed.
 
 6) Create trace-cmd report and let text2pcap tool convert to pcap format: <pre>trace-cmd report | text2pcap - dump.cap</pre>
 7) Open pcap file with wireshark
+
+Example dumps
+-------------
+The examples folder contains some dumps taken from a patched brcmfmac driver
